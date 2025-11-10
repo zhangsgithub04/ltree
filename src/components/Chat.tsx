@@ -6,6 +6,7 @@ import ProgressTracker from './ProgressTracker';
 import TopicSuggestions from './TopicSuggestions';
 import ConversationTree from './ConversationTree';
 import ConversationBranchTree from './ConversationBranchTree';
+import SessionsList from './SessionsList';
 
 // Component to render message content with clickable list items
 function MessageContent({ content, onItemClick, messageId }: { 
@@ -67,19 +68,22 @@ interface TreeBranch {
 }
 
 export default function Chat() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, append } = useChat();
+  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, append, setMessages } = useChat();
   const [learningProgress, setLearningProgress] = useState({
     topicsLearned: 0,
     questionsAsked: 0,
     currentLevel: 'Beginner',
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activePanel, setActivePanel] = useState<'tree' | 'progress'>('progress');
+  const [activePanel, setActivePanel] = useState<'sessions' | 'tree' | 'progress'>('sessions');
   const [conversationTree, setConversationTree] = useState<TreeBranch[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [sessionTitle, setSessionTitle] = useState<string>('New Conversation');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pendingBranchRef = useRef<{ fromNodeId: string; clickedItem: string } | null>(null);
   const treeNodesMapRef = useRef<Map<string, TreeBranch>>(new Map());
   const processedMessageIdsRef = useRef<Set<string>>(new Set());
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Build and maintain tree structure
   useEffect(() => {
@@ -166,6 +170,57 @@ export default function Chat() {
     console.log('Nodes map size:', treeNodesMapRef.current.size);
   }, [messages]);
 
+  // Auto-save session when messages or tree change
+  useEffect(() => {
+    if (messages.length === 0 || !currentSessionId) {
+      return;
+    }
+
+    // Debounce save to avoid too frequent API calls
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        // Generate title from first user message if still "New Conversation"
+        let title = sessionTitle;
+        if (title === 'New Conversation' && messages.length > 0) {
+          const firstUserMessage = messages.find(m => m.role === 'user');
+          if (firstUserMessage) {
+            title = firstUserMessage.content.slice(0, 50) + (firstUserMessage.content.length > 50 ? '...' : '');
+            setSessionTitle(title);
+          }
+        }
+
+        await fetch(`/api/sessions/${currentSessionId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            messages: messages.map(m => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              timestamp: new Date().toISOString(),
+            })),
+            conversationTree,
+          }),
+        });
+        
+        console.log('Session saved:', currentSessionId);
+      } catch (error) {
+        console.error('Error saving session:', error);
+      }
+    }, 1000); // Save after 1 second of inactivity
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [messages, conversationTree, currentSessionId, sessionTitle]);
+
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -210,6 +265,61 @@ export default function Chat() {
       }, 2000);
     }
   };
+
+  const handleNewSession = async () => {
+    try {
+      const response = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'New Conversation' }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setCurrentSessionId(data.session.id);
+        setSessionTitle('New Conversation');
+        setMessages([]);
+        setConversationTree([]);
+        treeNodesMapRef.current.clear();
+        processedMessageIdsRef.current.clear();
+        pendingBranchRef.current = null;
+      }
+    } catch (error) {
+      console.error('Error creating new session:', error);
+    }
+  };
+
+  const handleSelectSession = async (sessionId: string) => {
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        setCurrentSessionId(data.session.id);
+        setSessionTitle(data.session.title);
+        setMessages(data.session.messages || []);
+        setConversationTree(data.session.conversationTree || []);
+        
+        // Reset tree building state
+        treeNodesMapRef.current.clear();
+        processedMessageIdsRef.current.clear();
+        pendingBranchRef.current = null;
+        
+        // Close sidebar on mobile
+        setIsSidebarOpen(false);
+      }
+    } catch (error) {
+      console.error('Error loading session:', error);
+    }
+  };
+
+  // Create initial session on mount
+  useEffect(() => {
+    if (!currentSessionId) {
+      handleNewSession();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="relative">
@@ -343,41 +453,64 @@ export default function Chat() {
         isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
       }`}
     >
-      <div className="h-full flex flex-col p-4">
+      <div className="h-full flex flex-col">
         {/* Panel Tabs */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-1 p-2 border-b border-gray-200 dark:border-gray-700">
+          <button
+            onClick={() => setActivePanel('sessions')}
+            className={`flex-1 px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+              activePanel === 'sessions'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+            }`}
+          >
+            💬 Chats
+          </button>
           <button
             onClick={() => setActivePanel('progress')}
-            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`flex-1 px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
               activePanel === 'progress'
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
             }`}
           >
-            📊 Progress
+            📊 Stats
           </button>
           <button
             onClick={() => setActivePanel('tree')}
-            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`flex-1 px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
               activePanel === 'tree'
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
             }`}
           >
-            🌳 Tree
+            🌳 Info
           </button>
         </div>
 
         {/* Panel Content */}
-        <div className="flex-1 overflow-auto">
-          {activePanel === 'progress' ? (
-            <div className="space-y-4">
+        <div className="flex-1 overflow-hidden">
+          {activePanel === 'sessions' ? (
+            <SessionsList
+              onSelectSession={handleSelectSession}
+              onNewSession={handleNewSession}
+              currentSessionId={currentSessionId}
+            />
+          ) : activePanel === 'progress' ? (
+            <div className="p-4 space-y-4 overflow-y-auto h-full">
               <ProgressTracker progress={learningProgress} />
               <TopicSuggestions />
             </div>
           ) : (
-            <div className="text-center p-6 text-gray-500 dark:text-gray-400">
-              <p>The conversation tree is displayed at the bottom of the screen</p>
+            <div className="p-6 text-center text-gray-500 dark:text-gray-400 overflow-y-auto h-full">
+              <div className="space-y-4">
+                <p className="font-medium">📜 Conversation Flow</p>
+                <p className="text-sm">Shows your linear conversation timeline in the left panel</p>
+                <div className="border-t border-gray-200 dark:border-gray-700 my-4"></div>
+                <p className="font-medium">🗺️ Learning Path Tree</p>
+                <p className="text-sm">Displays branching conversations at the bottom</p>
+                <p className="text-xs mt-2">Click items in AI responses to explore branches!</p>
+              </div>
             </div>
           )}
         </div>
