@@ -66,13 +66,6 @@ interface TreeBranch {
   branchFromNodeId?: string; // Track which node this branched from
 }
 
-interface ConversationGraph {
-  nodes: Map<string, TreeBranch>;
-  edges: Map<string, string[]>; // parentId -> childrenIds
-  rootId: string;
-  branches: Map<string, string[]>; // nodeId -> list of branch nodeIds
-}
-
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, append } = useChat();
   const [learningProgress, setLearningProgress] = useState({
@@ -82,156 +75,96 @@ export default function Chat() {
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<'tree' | 'progress'>('progress');
-  const [conversationGraph, setConversationGraph] = useState<ConversationGraph>({
-    nodes: new Map(),
-    edges: new Map(),
-    rootId: 'root',
-    branches: new Map()
-  });
-  const [currentBranchPath, setCurrentBranchPath] = useState<string[]>([]);
   const [conversationTree, setConversationTree] = useState<TreeBranch[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const lastMessageCountRef = useRef(0);
   const pendingBranchRef = useRef<{ fromNodeId: string; clickedItem: string } | null>(null);
+  const treeNodesMapRef = useRef<Map<string, TreeBranch>>(new Map());
+  const processedMessageIdsRef = useRef<Set<string>>(new Set());
 
-  // Build conversation graph dynamically based on messages and interactions
+  // Build and maintain tree structure
   useEffect(() => {
     if (messages.length === 0) {
-      setConversationGraph({
-        nodes: new Map(),
-        edges: new Map(),
-        rootId: 'root',
-        branches: new Map()
-      });
       setConversationTree([]);
-      lastMessageCountRef.current = 0;
+      treeNodesMapRef.current.clear();
+      processedMessageIdsRef.current.clear();
+      pendingBranchRef.current = null;
       return;
     }
 
-    // Process ALL messages every time to ensure graph is complete
-    const newGraph: ConversationGraph = {
-      nodes: new Map(),
-      edges: new Map(),
-      rootId: 'root',
-      branches: new Map()
-    };
+    // Process only new messages
+    const newMessages = messages.filter(msg => !processedMessageIdsRef.current.has(msg.id));
+    
+    if (newMessages.length === 0) {
+      return; // No new messages to process
+    }
 
-    // Process all messages
-    for (let i = 0; i < messages.length; i++) {
-      const message = messages[i];
-      const timestamp = Date.now() + i;
+    console.log('Processing', newMessages.length, 'new messages');
+    console.log('Pending branch:', pendingBranchRef.current);
 
-      // Check if this is a branch point (user clicked on a list item)
-      const branchInfo = pendingBranchRef.current;
-      const isBranchStart = branchInfo && i === messages.length - 2; // Second to last message
-
-      // Create node for this message
+    newMessages.forEach((message, index) => {
+      const globalIndex = messages.findIndex(m => m.id === message.id);
+      
+      // Create node
       const node: TreeBranch = {
         id: message.id,
         content: message.content,
         role: message.role,
         children: [],
-        timestamp,
-        parentId: i > 0 ? messages[i - 1].id : undefined,
-        clickedItem: isBranchStart ? branchInfo?.clickedItem : undefined,
-        branchFromNodeId: isBranchStart ? branchInfo?.fromNodeId : undefined
+        timestamp: Date.now() + globalIndex,
+        clickedItem: undefined,
+        branchFromNodeId: undefined,
       };
 
-      newGraph.nodes.set(message.id, node);
+      // Determine parent
+      let parentNode: TreeBranch | undefined;
 
-      // Update edges - for branching, connect to the source node instead of just previous message
-      let actualParentId = node.parentId;
-      
-      if (node.branchFromNodeId) {
+      if (pendingBranchRef.current && index === 0) {
         // This is a branch - connect to the node we branched from
-        actualParentId = node.branchFromNodeId;
+        const branchFromId = pendingBranchRef.current.fromNodeId;
+        parentNode = treeNodesMapRef.current.get(branchFromId);
         
-        // Track this as a branch
-        const branches = newGraph.branches.get(node.branchFromNodeId) || [];
-        if (!branches.includes(message.id)) {
-          branches.push(message.id);
-          newGraph.branches.set(node.branchFromNodeId, branches);
+        if (parentNode) {
+          node.branchFromNodeId = branchFromId;
+          node.clickedItem = pendingBranchRef.current.clickedItem;
+          console.log('Creating branch from', branchFromId, 'for item:', node.clickedItem);
         }
+        
+        pendingBranchRef.current = null; // Clear after use
+      } else if (globalIndex > 0) {
+        // Regular sequential message - connect to previous message
+        const prevMessage = messages[globalIndex - 1];
+        parentNode = treeNodesMapRef.current.get(prevMessage.id);
       }
 
-      if (actualParentId) {
-        const siblings = newGraph.edges.get(actualParentId) || [];
-        if (!siblings.includes(message.id)) {
-          siblings.push(message.id);
-          newGraph.edges.set(actualParentId, siblings);
+      // Add to tree structure
+      treeNodesMapRef.current.set(message.id, node);
+      
+      if (parentNode) {
+        // Check if this child already exists to avoid duplicates
+        if (!parentNode.children.find(child => child.id === node.id)) {
+          parentNode.children.push(node);
+          console.log('Added child', node.id, 'to parent', parentNode.id);
         }
+      } else {
+        // This is a root node
+        setConversationTree((prevTree) => {
+          if (prevTree.length === 0) {
+            console.log('Set root node:', node.id);
+            return [node];
+          }
+          return prevTree;
+        });
       }
-    }
 
-    // Clear pending branch after processing
-    if (pendingBranchRef.current && messages.length >= lastMessageCountRef.current + 2) {
-      pendingBranchRef.current = null;
-    }
+      processedMessageIdsRef.current.add(message.id);
+    });
 
-    setConversationGraph(newGraph);
+    // Trigger re-render by updating state
+    setConversationTree((prevTree) => [...prevTree]);
+    
+    console.log('Tree structure updated');
+    console.log('Nodes map size:', treeNodesMapRef.current.size);
   }, [messages]);
-
-  // Build tree structure from graph for visualization
-  useEffect(() => {
-    if (conversationGraph.nodes.size === 0) {
-      console.log('No graph nodes, skipping tree build');
-      setConversationTree([]);
-      return;
-    }
-
-    console.log('Building tree from graph with', conversationGraph.nodes.size, 'nodes');
-    console.log('Branches:', Array.from(conversationGraph.branches.entries()));
-
-    const buildTreeFromGraph = (): TreeBranch[] => {
-      const tree: TreeBranch[] = [];
-      const visited = new Set<string>();
-
-      const buildNode = (nodeId: string): TreeBranch | null => {
-        if (visited.has(nodeId)) return null;
-        visited.add(nodeId);
-
-        const node = conversationGraph.nodes.get(nodeId);
-        if (!node) {
-          console.log('Node not found:', nodeId);
-          return null;
-        }
-
-        // Get children - both regular sequence and branches
-        const regularChildren = conversationGraph.edges.get(nodeId) || [];
-        const branchChildren = conversationGraph.branches.get(nodeId) || [];
-        
-        // Combine and deduplicate
-        const allChildIds = [...new Set([...regularChildren, ...branchChildren])];
-        
-        const children = allChildIds
-          .map(childId => buildNode(childId))
-          .filter((child): child is TreeBranch => child !== null);
-
-        return {
-          ...node,
-          children
-        };
-      };
-
-      // Find root nodes (first user message in conversation)
-      const firstMessage = messages[0];
-      if (firstMessage) {
-        console.log('Building from first message:', firstMessage.id);
-        const rootNode = buildNode(firstMessage.id);
-        if (rootNode) {
-          console.log('Root node built with', rootNode.children.length, 'children');
-          tree.push(rootNode);
-        } else {
-          console.log('Failed to build root node');
-        }
-      }
-
-      console.log('Final tree:', tree);
-      return tree;
-    };
-
-    setConversationTree(buildTreeFromGraph());
-  }, [conversationGraph, messages]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -283,7 +216,7 @@ export default function Chat() {
       <div className="flex flex-col gap-6">
         {/* Top Section - Learning Path and Chat */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Learning Path Panel - Left Side */}
+          {/* Conversation Flow Panel - Left Side */}
           <div className="lg:col-span-1 order-2 lg:order-1">
             <div className="lg:sticky lg:top-4">
               <div className="h-[500px]">
@@ -390,7 +323,7 @@ export default function Chat() {
       </div>
       </div>
 
-      {/* Bottom Section - Conversation Tree spanning full width */}
+      {/* Bottom Section - Learning Path Tree spanning full width */}
       <div className="w-full">
         <div className="h-[300px]">
           <ConversationBranchTree tree={conversationTree} onNodeClick={handleNodeClick} />
@@ -398,7 +331,7 @@ export default function Chat() {
         {/* Debug info */}
         {process.env.NODE_ENV === 'development' && (
           <div className="text-xs text-gray-500 mt-2 p-2 bg-gray-100 dark:bg-gray-700 rounded">
-            Debug: {messages.length} messages, {conversationTree.length} tree nodes, {conversationGraph.nodes.size} graph nodes
+            Debug: {messages.length} messages, {conversationTree.length} tree roots, {treeNodesMapRef.current.size} total nodes
           </div>
         )}
       </div>

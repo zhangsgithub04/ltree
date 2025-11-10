@@ -293,19 +293,19 @@ export default function ConversationBranchTree({ tree: treeData, onNodeClick }: 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 h-full flex flex-col relative">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-        <span>🌳</span>
-        <span>Conversation Tree</span>
-        <span className="text-xs text-gray-500">({treeData.length} nodes)</span>
+        <span>🗺️</span>
+        <span>Learning Path Tree</span>
+        {treeData.length > 0 && <span className="text-xs text-gray-500">({treeData.length} nodes)</span>}
       </h3>
       
       <div className="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 dark:from-gray-900 dark:to-gray-800">
         {!tree ? (
           <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500">
             <div className="text-center p-6">
-              <div className="text-4xl mb-2">🌳</div>
-              <p className="font-medium">Branching Conversations</p>
-              <p className="text-sm mt-2">Start chatting to see<br />your conversation tree</p>
-              <p className="text-xs mt-2 text-gray-400">Waiting for messages...</p>
+              <div className="text-4xl mb-2">🗺️</div>
+              <p className="font-medium">Learning Path Tree</p>
+              <p className="text-sm mt-2">Click items in AI responses<br />to explore different topics</p>
+              <p className="text-xs mt-2 text-gray-400">Branches will appear here</p>
             </div>
           </div>
         ) : (
@@ -319,13 +319,14 @@ export default function ConversationBranchTree({ tree: treeData, onNodeClick }: 
         )}
       </div>
 
-      {/* Tooltip */}
-      {tooltip && (
+      {/* Tooltip - Portal to ensure it appears above everything */}
+      {tooltip && typeof window !== 'undefined' && (
         <div 
-          className="fixed z-[9999] bg-gray-900/95 backdrop-blur-sm text-white text-sm rounded-lg p-4 shadow-2xl max-w-3xl pointer-events-none border-2 border-blue-500"
+          className="fixed bg-gray-900/95 backdrop-blur-sm text-white text-sm rounded-lg p-4 shadow-2xl max-w-md pointer-events-none border-2 border-blue-500"
           style={{ 
-            left: `${tooltip.x + 15}px`, 
-            top: `${tooltip.y - 100}px`,
+            left: `${Math.min(tooltip.x + 20, window.innerWidth - 400)}px`, 
+            top: `${Math.max(10, tooltip.y - 150)}px`,
+            zIndex: 2147483647, // Maximum z-index value
           }}
         >
           <div className="flex items-center gap-2 mb-2">
@@ -336,7 +337,7 @@ export default function ConversationBranchTree({ tree: treeData, onNodeClick }: 
               {tooltip.content === 'Start' ? 'Conversation Start' : (tooltip.role === 'user' ? 'You' : 'AI Tutor')}
             </div>
           </div>
-          <div className="text-gray-100 whitespace-pre-wrap max-h-[400px] overflow-y-auto leading-relaxed p-2 bg-gray-800/50 rounded">
+          <div className="text-gray-100 whitespace-pre-wrap max-h-[300px] overflow-y-auto leading-relaxed p-2 bg-gray-800/50 rounded text-xs">
             {tooltip.fullContent}
           </div>
           {tooltip.clickedItem && (

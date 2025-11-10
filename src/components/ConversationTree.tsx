@@ -224,17 +224,17 @@ export default function ConversationTree({ messages, onNodeClick }: Conversation
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 h-full flex flex-col relative">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-        <span>🗺️</span>
-        <span>Learning Path</span>
+        <span>�</span>
+        <span>Conversation Flow</span>
       </h3>
       
       <div className="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-lg bg-gradient-to-b from-blue-50 to-green-50 dark:from-gray-900 dark:to-gray-800">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500">
             <div className="text-center p-6">
-              <div className="text-4xl mb-2">🗺️</div>
-              <p className="font-medium">Your Learning Path</p>
-              <p className="text-sm mt-2">Start chatting to see<br />your journey unfold</p>
+              <div className="text-4xl mb-2">�</div>
+              <p className="font-medium">Conversation Flow</p>
+              <p className="text-sm mt-2">Start chatting to see<br />your conversation timeline</p>
             </div>
           </div>
         ) : (
@@ -248,13 +248,14 @@ export default function ConversationTree({ messages, onNodeClick }: Conversation
         )}
       </div>
 
-      {/* Tooltip */}
-      {tooltip && (
+      {/* Tooltip - Portal to ensure it appears above everything */}
+      {tooltip && typeof window !== 'undefined' && (
         <div 
-          className="fixed z-[9999] bg-gray-900/95 backdrop-blur-sm text-white text-sm rounded-lg p-4 shadow-2xl max-w-3xl pointer-events-none border-2 border-green-500"
+          className="fixed bg-gray-900/95 backdrop-blur-sm text-white text-sm rounded-lg p-4 shadow-2xl max-w-md pointer-events-none border-2 border-green-500"
           style={{ 
-            left: `${tooltip.x - 320}px`, 
-            top: `${tooltip.y + 10}px`,
+            left: `${Math.min(tooltip.x + 20, window.innerWidth - 400)}px`, 
+            top: `${Math.max(10, tooltip.y - 150)}px`,
+            zIndex: 2147483647, // Maximum z-index value
           }}
         >
           <div className="flex items-center gap-2 mb-2">
@@ -265,7 +266,7 @@ export default function ConversationTree({ messages, onNodeClick }: Conversation
               {tooltip.role === 'user' ? 'You' : 'AI Tutor'}
             </div>
           </div>
-          <div className="text-gray-100 whitespace-pre-wrap max-h-[400px] overflow-y-auto leading-relaxed p-2 bg-gray-800/50 rounded">
+          <div className="text-gray-100 whitespace-pre-wrap max-h-[300px] overflow-y-auto leading-relaxed p-2 bg-gray-800/50 rounded text-xs">
             {tooltip.fullContent}
           </div>
         </div>
@@ -283,7 +284,7 @@ export default function ConversationTree({ messages, onNodeClick }: Conversation
           </div>
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-          💡 Hover for summary · Click to jump
+          💡 Hover for details · Click to jump to message
         </p>
       </div>
     </div>
