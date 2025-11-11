@@ -38,10 +38,13 @@ export default function SessionsList({ onSelectSession, onNewSession, currentSes
         endpoint = '/api/sessions/shared';
       }
       
+      console.log('Loading sessions from:', endpoint, 'for tab:', tab);
       const response = await fetch(endpoint);
       const data = await response.json();
       
       if (response.ok) {
+        console.log('Sessions loaded:', data.sessions.length, 'sessions');
+        console.log('First session shareToken:', data.sessions[0]?.shareToken);
         setSessions(data.sessions);
       }
     } catch (error) {
@@ -162,7 +165,10 @@ export default function SessionsList({ onSelectSession, onNewSession, currentSes
           sessions.map((session) => (
             <div
               key={session.id}
-              onClick={() => onSelectSession(session.id, activeTab === 'shared', session.shareToken)}
+              onClick={() => {
+                console.log('Session clicked:', { id: session.id, isShared: activeTab === 'shared', shareToken: session.shareToken });
+                onSelectSession(session.id, activeTab === 'shared', session.shareToken);
+              }}
               className={`p-3 rounded-lg cursor-pointer transition-all group ${
                 currentSessionId === session.id
                   ? 'bg-blue-100 dark:bg-blue-900/30 ring-2 ring-blue-500'

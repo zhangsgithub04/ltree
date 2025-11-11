@@ -299,16 +299,21 @@ export default function Chat() {
     try {
       let response;
       
+      console.log('Loading session:', { sessionId, isShared, shareToken });
+      
       // Use different endpoint for shared sessions
       if (isShared && shareToken) {
+        console.log('Fetching shared session with token:', shareToken);
         response = await fetch(`/api/share/${shareToken}`);
         setIsViewingShared(true);
       } else {
+        console.log('Fetching own session:', sessionId);
         response = await fetch(`/api/sessions/${sessionId}`);
         setIsViewingShared(false);
       }
       
       const data = await response.json();
+      console.log('Session data received:', data);
       
       if (response.ok) {
         setCurrentSessionId(data.session.id);
@@ -316,6 +321,7 @@ export default function Chat() {
         
         // Load conversation tree first
         const loadedTree = data.session.conversationTree || [];
+        console.log('Loaded tree:', loadedTree);
         
         // Rebuild tree state from loaded tree
         treeNodesMapRef.current.clear();
@@ -334,12 +340,14 @@ export default function Chat() {
         };
         
         rebuildTreeMap(loadedTree);
+        console.log('Tree nodes map size:', treeNodesMapRef.current.size);
         
         // Set tree first
         setConversationTree(loadedTree);
         
         // Then load messages from MongoDB
         const loadedMessages = data.session.messages || [];
+        console.log('Loaded messages count:', loadedMessages.length);
         setMessages(loadedMessages);
         
         // Load sharing info
@@ -348,6 +356,8 @@ export default function Chat() {
         
         // Close sidebar on mobile
         setIsSidebarOpen(false);
+      } else {
+        console.error('Failed to load session:', data);
       }
     } catch (error) {
       console.error('Error loading session:', error);

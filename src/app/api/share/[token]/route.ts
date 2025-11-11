@@ -30,6 +30,9 @@ export async function GET(
         createdAt: session.createdAt,
         updatedAt: session.updatedAt,
         messageCount: session.messageCount,
+        conversationTree: session.conversationTree,
+        isPublic: session.isPublic,
+        shareToken: session.shareToken,
       },
       messages: messages.map(m => ({
         id: m.id,
