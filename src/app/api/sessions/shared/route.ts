@@ -10,7 +10,9 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    console.log('Fetching public sessions from others, current user:', session.id);
     const sessions = await getPublicSessionsFromOthers(session.id);
+    console.log('Found shared sessions:', sessions.length);
     
     return NextResponse.json({ sessions });
   } catch (error) {

@@ -335,6 +335,8 @@ export async function getPublicSessionsFromOthers(currentUserId: string): Promis
   const db = await getDb();
   const sessionsCollection = db.collection<ChatSession>('sessions');
   
+  console.log('Querying for public sessions, excluding userId:', currentUserId);
+  
   // Get all public sessions that are NOT owned by current user
   const sessions = await sessionsCollection
     .find({ 
@@ -343,6 +345,16 @@ export async function getPublicSessionsFromOthers(currentUserId: string): Promis
     })
     .sort({ updatedAt: -1 })
     .toArray();
+  
+  console.log('Query result:', sessions.length, 'sessions found');
+  if (sessions.length > 0) {
+    console.log('Sample session:', {
+      id: sessions[0].id,
+      userId: sessions[0].userId,
+      isPublic: sessions[0].isPublic,
+      title: sessions[0].title
+    });
+  }
   
   return sessions;
 }

@@ -575,7 +575,12 @@ export default function Chat() {
             />
           ) : activePanel === 'progress' ? (
             <div className="p-4 space-y-4 overflow-y-auto h-full">
-              <ProgressTracker progress={learningProgress} />
+              <ProgressTracker 
+                progress={learningProgress}
+                currentSessionId={currentSessionId}
+                messages={messages}
+                conversationTree={conversationTree}
+              />
               <TopicSuggestions />
             </div>
           ) : (
