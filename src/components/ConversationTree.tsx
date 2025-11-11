@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface TreeNode {
   id: string;
@@ -11,6 +12,7 @@ interface TreeNode {
   x?: number;
   y?: number;
   fullContent?: string;
+  timestamp?: string | number;
 }
 
 interface ConversationTreeProps {
@@ -18,6 +20,7 @@ interface ConversationTreeProps {
     id: string;
     content: string;
     role: string;
+    timestamp?: string | number;
   }>;
   onNodeClick: (nodeId: string) => void;
 }
@@ -32,6 +35,7 @@ export default function ConversationTree({ messages, onNodeClick }: Conversation
     content: string; 
     fullContent: string;
     role?: string;
+    timestamp?: string | number;
   } | null>(null);
 
   // Build tree structure from linear messages
@@ -59,6 +63,7 @@ export default function ConversationTree({ messages, onNodeClick }: Conversation
           children: [],
           parent: currentNode.id,
           fullContent: msg.content, // Store full content
+          timestamp: msg.timestamp,
         };
         
         currentNode.children.push(node);
@@ -208,6 +213,7 @@ export default function ConversationTree({ messages, onNodeClick }: Conversation
         content: hoveredNodeData.content,
         fullContent: hoveredNodeData.fullContent || hoveredNodeData.content,
         role: hoveredNodeData.role,
+        timestamp: hoveredNodeData.timestamp,
       });
     } else {
       setHoveredNode(null);
@@ -248,8 +254,8 @@ export default function ConversationTree({ messages, onNodeClick }: Conversation
         )}
       </div>
 
-      {/* Tooltip - Portal to ensure it appears above everything */}
-      {tooltip && typeof window !== 'undefined' && (
+      {/* Tooltip - Use Portal to render at document root */}
+      {tooltip && typeof window !== 'undefined' && createPortal(
         <div 
           className="fixed bg-gray-900/95 backdrop-blur-sm text-white text-sm rounded-lg p-4 shadow-2xl max-w-md pointer-events-none border-2 border-green-500"
           style={{ 
@@ -266,10 +272,16 @@ export default function ConversationTree({ messages, onNodeClick }: Conversation
               {tooltip.role === 'user' ? 'You' : 'AI Tutor'}
             </div>
           </div>
+          {tooltip.timestamp && (
+            <div className="text-xs text-gray-400 mb-2">
+              🕒 {new Date(tooltip.timestamp).toLocaleString()}
+            </div>
+          )}
           <div className="text-gray-100 whitespace-pre-wrap max-h-[300px] overflow-y-auto leading-relaxed p-2 bg-gray-800/50 rounded text-xs">
             {tooltip.fullContent}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
