@@ -91,26 +91,31 @@ export default function ConversationBranchTree({ tree: treeData, onNodeClick }: 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const container = canvas.parentElement;
-    if (container) {
-      canvas.width = container.clientWidth;
-      canvas.height = Math.max(400, container.clientHeight);
-    }
-
-    // Clear canvas first
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
     const nodeRadius = 20;
     const horizontalSpacing = 140;
     const verticalSpacing = 70;
     const startX = 60;
-    const centerY = canvas.height / 2;
 
-    // Calculate tree depth for better positioning
+    // Calculate tree depth to determine required width
     const calculateDepth = (node: BranchNode): number => {
       if (node.children.length === 0) return 0;
       return 1 + Math.max(...node.children.map(calculateDepth));
     };
+
+    const maxDepth = calculateDepth(tree);
+    const requiredWidth = startX + (maxDepth + 1) * horizontalSpacing + 100; // Extra padding
+
+    const container = canvas.parentElement;
+    if (container) {
+      // Set canvas width to be at least the container width or required width, whichever is larger
+      canvas.width = Math.max(container.clientWidth, requiredWidth);
+      canvas.height = Math.max(400, container.clientHeight);
+    }
+
+    const centerY = canvas.height / 2;
+
+    // Clear canvas first
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Layout nodes horizontally (left to right) with vertical spacing for siblings
     const layoutNodes = (node: BranchNode, depth: number, minY: number, maxY: number): number => {
@@ -313,13 +318,15 @@ export default function ConversationBranchTree({ tree: treeData, onNodeClick }: 
             </div>
           </div>
         ) : (
-          <canvas
-            ref={canvasRef}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={() => { setHoveredNode(null); setTooltip(null); }}
-            onClick={handleClick}
-            className="cursor-pointer w-full h-full"
-          />
+          <div className="w-full h-full overflow-auto">
+            <canvas
+              ref={canvasRef}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={() => { setHoveredNode(null); setTooltip(null); }}
+              onClick={handleClick}
+              className="cursor-pointer min-w-full"
+            />
+          </div>
         )}
       </div>
 
