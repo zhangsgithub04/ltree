@@ -14,6 +14,7 @@ interface BranchNode {
   fullContent?: string;
   clickedItem?: string;
   hasBranches?: boolean;
+  timestamp?: number;
 }
 
 interface ConversationBranchTreeProps {
@@ -41,6 +42,7 @@ export default function ConversationBranchTree({ tree: treeData, onNodeClick }: 
     fullContent: string;
     clickedItem?: string;
     role?: string;
+    timestamp?: number;
   } | null>(null);
 
   // Build tree structure from provided tree data
@@ -62,6 +64,7 @@ export default function ConversationBranchTree({ tree: treeData, onNodeClick }: 
         fullContent: node.content,
         clickedItem: node.clickedItem,
         hasBranches: children.length > 1,
+        timestamp: node.timestamp,
       };
     };
 
@@ -277,6 +280,7 @@ export default function ConversationBranchTree({ tree: treeData, onNodeClick }: 
         fullContent: hoveredNodeData.fullContent || hoveredNodeData.content,
         clickedItem: hoveredNodeData.clickedItem,
         role: hoveredNodeData.role,
+        timestamp: hoveredNodeData.timestamp,
       });
     } else {
       setHoveredNode(null);
@@ -337,6 +341,11 @@ export default function ConversationBranchTree({ tree: treeData, onNodeClick }: 
               {tooltip.content === 'Start' ? 'Conversation Start' : (tooltip.role === 'user' ? 'You' : 'AI Tutor')}
             </div>
           </div>
+          {tooltip.timestamp && (
+            <div className="text-xs text-gray-400 mb-2">
+              🕒 {new Date(tooltip.timestamp).toLocaleString()}
+            </div>
+          )}
           <div className="text-gray-100 whitespace-pre-wrap max-h-[300px] overflow-y-auto leading-relaxed p-2 bg-gray-800/50 rounded text-xs">
             {tooltip.fullContent}
           </div>

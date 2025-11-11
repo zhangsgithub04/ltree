@@ -330,3 +330,54 @@ export async function getPublicSession(shareToken: string): Promise<{
   
   return { session, messages };
 }
+
+export async function getPublicSessionsFromOthers(currentUserId: string): Promise<ChatSession[]> {
+  const db = await getDb();
+  const sessionsCollection = db.collection<ChatSession>('sessions');
+  
+  // Get all public sessions that are NOT owned by current user
+  const sessions = await sessionsCollection
+    .find({ 
+      isPublic: true,
+      userId: { $ne: currentUserId }
+    })
+    .sort({ updatedAt: -1 })
+    .toArray();
+  
+  return sessions;
+}
+
+export async function getUserPublicSessions(userId: string): Promise<ChatSession[]> {
+  const db = await getDb();
+  const sessionsCollection = db.collection<ChatSession>('sessions');
+  
+  // Get user's public sessions
+  const sessions = await sessionsCollection
+    .find({ 
+      userId,
+      isPublic: true
+    })
+    .sort({ updatedAt: -1 })
+    .toArray();
+  
+  return sessions;
+}
+
+export async function getUserPrivateSessions(userId: string): Promise<ChatSession[]> {
+  const db = await getDb();
+  const sessionsCollection = db.collection<ChatSession>('sessions');
+  
+  // Get user's private sessions
+  const sessions = await sessionsCollection
+    .find({ 
+      userId,
+      $or: [
+        { isPublic: false },
+        { isPublic: { $exists: false } }
+      ]
+    })
+    .sort({ updatedAt: -1 })
+    .toArray();
+  
+  return sessions;
+}

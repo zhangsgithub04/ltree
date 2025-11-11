@@ -25,7 +25,7 @@ export default async function Home() {
               </div>
             </div>
             <p className="text-gray-600 dark:text-gray-300">
-              Your adaptive learning companion powered by Google Gemini
+              Your adaptive learning companion powered by AI and SZ.
             </p>
           </header>
           <Chat />

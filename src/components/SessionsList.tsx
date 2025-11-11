@@ -9,6 +9,7 @@ interface Session {
   updatedAt: string;
   messageCount?: number;
   isPublic?: boolean;
+  userId?: string;
 }
 
 interface SessionsListProps {
@@ -17,13 +18,26 @@ interface SessionsListProps {
   currentSessionId: string | null;
 }
 
+type TabType = 'private' | 'public' | 'shared';
+
 export default function SessionsList({ onSelectSession, onNewSession, currentSessionId }: SessionsListProps) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabType>('private');
 
-  const loadSessions = async () => {
+  const loadSessions = async (tab: TabType = activeTab) => {
+    setIsLoading(true);
     try {
-      const response = await fetch('/api/sessions');
+      let endpoint = '/api/sessions';
+      if (tab === 'private') {
+        endpoint = '/api/sessions/private';
+      } else if (tab === 'public') {
+        endpoint = '/api/sessions/public';
+      } else if (tab === 'shared') {
+        endpoint = '/api/sessions/shared';
+      }
+      
+      const response = await fetch(endpoint);
       const data = await response.json();
       
       if (response.ok) {
@@ -37,8 +51,13 @@ export default function SessionsList({ onSelectSession, onNewSession, currentSes
   };
 
   useEffect(() => {
-    loadSessions();
-  }, []);
+    loadSessions(activeTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+  };
 
   const handleDelete = async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -91,6 +110,42 @@ export default function SessionsList({ onSelectSession, onNewSession, currentSes
         </button>
       </div>
 
+      {/* Tabs */}
+      <div className="border-b border-gray-200 dark:border-gray-700">
+        <div className="flex">
+          <button
+            onClick={() => handleTabChange('private')}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'private'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            🔒 My Sessions
+          </button>
+          <button
+            onClick={() => handleTabChange('public')}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'public'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            📤 Shared by Me
+          </button>
+          <button
+            onClick={() => handleTabChange('shared')}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'shared'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            📥 Shared with Me
+          </button>
+        </div>
+      </div>
+
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {isLoading ? (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
@@ -135,13 +190,16 @@ export default function SessionsList({ onSelectSession, onNewSession, currentSes
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={(e) => handleDelete(session.id, e)}
-                  className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600 transition-opacity p-1"
-                  title="Delete session"
-                >
-                  🗑️
-                </button>
+                {/* Only show delete button for own sessions (private and public tabs) */}
+                {activeTab !== 'shared' && (
+                  <button
+                    onClick={(e) => handleDelete(session.id, e)}
+                    className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600 transition-opacity p-1"
+                    title="Delete session"
+                  >
+                    🗑️
+                  </button>
+                )}
               </div>
             </div>
           ))
