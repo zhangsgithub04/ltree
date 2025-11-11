@@ -10,10 +10,11 @@ interface Session {
   messageCount?: number;
   isPublic?: boolean;
   userId?: string;
+  shareToken?: string;
 }
 
 interface SessionsListProps {
-  onSelectSession: (sessionId: string) => void;
+  onSelectSession: (sessionId: string, isShared?: boolean, shareToken?: string) => void;
   onNewSession: () => void;
   currentSessionId: string | null;
 }
@@ -161,7 +162,7 @@ export default function SessionsList({ onSelectSession, onNewSession, currentSes
           sessions.map((session) => (
             <div
               key={session.id}
-              onClick={() => onSelectSession(session.id)}
+              onClick={() => onSelectSession(session.id, activeTab === 'shared', session.shareToken)}
               className={`p-3 rounded-lg cursor-pointer transition-all group ${
                 currentSessionId === session.id
                   ? 'bg-blue-100 dark:bg-blue-900/30 ring-2 ring-blue-500'

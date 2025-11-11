@@ -82,6 +82,7 @@ export default function Chat() {
   const [sessionTitle, setSessionTitle] = useState<string>('New Conversation');
   const [isPublic, setIsPublic] = useState<boolean>(false);
   const [shareToken, setShareToken] = useState<string | undefined>(undefined);
+  const [isViewingShared, setIsViewingShared] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pendingBranchRef = useRef<{ fromNodeId: string; clickedItem: string } | null>(null);
   const treeNodesMapRef = useRef<Map<string, TreeBranch>>(new Map());
@@ -287,15 +288,26 @@ export default function Chat() {
         treeNodesMapRef.current.clear();
         processedMessageIdsRef.current.clear();
         pendingBranchRef.current = null;
+        setIsViewingShared(false);
       }
     } catch (error) {
       console.error('Error creating new session:', error);
     }
   };
 
-  const handleSelectSession = async (sessionId: string) => {
+  const handleSelectSession = async (sessionId: string, isShared: boolean = false, shareToken?: string) => {
     try {
-      const response = await fetch(`/api/sessions/${sessionId}`);
+      let response;
+      
+      // Use different endpoint for shared sessions
+      if (isShared && shareToken) {
+        response = await fetch(`/api/share/${shareToken}`);
+        setIsViewingShared(true);
+      } else {
+        response = await fetch(`/api/sessions/${sessionId}`);
+        setIsViewingShared(false);
+      }
+      
       const data = await response.json();
       
       if (response.ok) {
@@ -369,18 +381,28 @@ export default function Chat() {
           {/* Chat Header */}
           <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-900">
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                {sessionTitle}
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                  {sessionTitle}
+                </h3>
+                {isViewingShared && (
+                  <span className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-2 py-0.5 rounded">
+                    📥 Shared Session
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {messages.length} messages
+                {isViewingShared && ' • You can continue chatting to explore further'}
               </p>
             </div>
-            <ShareButton 
-              sessionId={currentSessionId} 
-              isPublic={isPublic}
-              shareToken={shareToken}
-            />
+            {!isViewingShared && (
+              <ShareButton 
+                sessionId={currentSessionId} 
+                isPublic={isPublic}
+                shareToken={shareToken}
+              />
+            )}
           </div>
           
           {/* Messages Container */}
