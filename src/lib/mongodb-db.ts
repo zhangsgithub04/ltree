@@ -79,6 +79,8 @@ export interface ChatSession {
   createdAt: Date;
   updatedAt: Date;
   messageCount?: number; // Denormalized count for performance
+  isPublic?: boolean; // Whether the session is publicly shareable
+  shareToken?: string; // Unique token for sharing
 }
 
 export async function createSession(userId: string, title: string): Promise<ChatSession> {
@@ -93,6 +95,8 @@ export async function createSession(userId: string, title: string): Promise<Chat
     createdAt: new Date(),
     updatedAt: new Date(),
     messageCount: 0,
+    isPublic: false,
+    shareToken: crypto.randomUUID(), // Generate unique share token
   };
   
   await sessionsCollection.insertOne(session);
@@ -275,4 +279,54 @@ export async function addMessage(
   );
   
   return newMessage;
+}
+
+// ==================== SHARING ====================
+
+export async function toggleSessionPublic(
+  sessionId: string,
+  isPublic: boolean
+): Promise<ChatSession | null> {
+  const db = await getDb();
+  const sessionsCollection = db.collection<ChatSession>('sessions');
+  
+  await sessionsCollection.updateOne(
+    { id: sessionId },
+    { 
+      $set: { 
+        isPublic,
+        updatedAt: new Date()
+      } 
+    }
+  );
+  
+  const updatedSession = await sessionsCollection.findOne({ id: sessionId });
+  return updatedSession;
+}
+
+export async function getPublicSession(shareToken: string): Promise<{
+  session: ChatSession | null;
+  messages: ChatMessage[];
+}> {
+  const db = await getDb();
+  const sessionsCollection = db.collection<ChatSession>('sessions');
+  const messagesCollection = db.collection<ChatMessage>('messages');
+  
+  // Find public session by share token
+  const session = await sessionsCollection.findOne({ 
+    shareToken,
+    isPublic: true 
+  });
+  
+  if (!session) {
+    return { session: null, messages: [] };
+  }
+  
+  // Fetch all messages for this session
+  const messages = await messagesCollection
+    .find({ sessionId: session.id })
+    .sort({ order: 1 })
+    .toArray();
+  
+  return { session, messages };
 }

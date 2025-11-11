@@ -8,6 +8,7 @@ interface Session {
   createdAt: string;
   updatedAt: string;
   messageCount?: number;
+  isPublic?: boolean;
 }
 
 interface SessionsListProps {
@@ -114,9 +115,16 @@ export default function SessionsList({ onSelectSession, onNewSession, currentSes
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-gray-900 dark:text-white truncate text-sm">
-                    {session.title}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-medium text-gray-900 dark:text-white truncate text-sm">
+                      {session.title}
+                    </h3>
+                    {session.isPublic && (
+                      <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded">
+                        🌐 Public
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 mt-1">
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {formatDate(session.updatedAt)}

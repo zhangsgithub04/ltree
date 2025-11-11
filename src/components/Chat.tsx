@@ -7,6 +7,7 @@ import TopicSuggestions from './TopicSuggestions';
 import ConversationTree from './ConversationTree';
 import ConversationBranchTree from './ConversationBranchTree';
 import SessionsList from './SessionsList';
+import ShareButton from './ShareButton';
 
 // Component to render message content with clickable list items
 function MessageContent({ content, onItemClick, messageId }: { 
@@ -79,6 +80,8 @@ export default function Chat() {
   const [conversationTree, setConversationTree] = useState<TreeBranch[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [sessionTitle, setSessionTitle] = useState<string>('New Conversation');
+  const [isPublic, setIsPublic] = useState<boolean>(false);
+  const [shareToken, setShareToken] = useState<string | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pendingBranchRef = useRef<{ fromNodeId: string; clickedItem: string } | null>(null);
   const treeNodesMapRef = useRef<Map<string, TreeBranch>>(new Map());
@@ -298,13 +301,38 @@ export default function Chat() {
       if (response.ok) {
         setCurrentSessionId(data.session.id);
         setSessionTitle(data.session.title);
-        setMessages(data.session.messages || []);
-        setConversationTree(data.session.conversationTree || []);
         
-        // Reset tree building state
+        // Load conversation tree first
+        const loadedTree = data.session.conversationTree || [];
+        
+        // Rebuild tree state from loaded tree
         treeNodesMapRef.current.clear();
         processedMessageIdsRef.current.clear();
         pendingBranchRef.current = null;
+        
+        // Recursively rebuild the tree nodes map
+        const rebuildTreeMap = (branches: TreeBranch[]) => {
+          branches.forEach(branch => {
+            treeNodesMapRef.current.set(branch.id, branch);
+            processedMessageIdsRef.current.add(branch.id);
+            if (branch.children && branch.children.length > 0) {
+              rebuildTreeMap(branch.children);
+            }
+          });
+        };
+        
+        rebuildTreeMap(loadedTree);
+        
+        // Set tree first
+        setConversationTree(loadedTree);
+        
+        // Then load messages from MongoDB
+        const loadedMessages = data.session.messages || [];
+        setMessages(loadedMessages);
+        
+        // Load sharing info
+        setIsPublic(data.session.isPublic || false);
+        setShareToken(data.session.shareToken);
         
         // Close sidebar on mobile
         setIsSidebarOpen(false);
@@ -338,8 +366,25 @@ export default function Chat() {
           {/* Main Chat Area */}
           <div className="lg:col-span-4 order-1 lg:order-2 relative">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+          {/* Chat Header */}
+          <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-900">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                {sessionTitle}
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {messages.length} messages
+              </p>
+            </div>
+            <ShareButton 
+              sessionId={currentSessionId} 
+              isPublic={isPublic}
+              shareToken={shareToken}
+            />
+          </div>
+          
           {/* Messages Container */}
-          <div className="h-[450px] overflow-y-auto p-6 space-y-4">
+          <div className="h-[400px] overflow-y-auto p-6 space-y-4">
             {messages.length === 0 ? (
               <div className="text-center text-gray-500 dark:text-gray-400 mt-20">
                 <div className="text-6xl mb-4">🎓</div>
